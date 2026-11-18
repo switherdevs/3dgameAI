@@ -1,0 +1,27 @@
+﻿
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "servers": {
+      "unityMCP": {
+        "type": "remote",
+        "url": "http://127.0.0.1:8080/mcp"
+      }
+    }
+  },
+  "provider": {
+    "9router": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "9Router",
+      "options": {
+        "baseURL": "http://127.0.0.1:20128/v1",
+        "apiKey": "sk-a5d24ffbf793e577-h9cqjn-83da38f5"
+      },
+      "models": {
+        "skibidi_sigmas_ultra": {
+          "name": "Skibidi Sigmas Ultra"
+        }
+      }
+    }
+  }
+}
