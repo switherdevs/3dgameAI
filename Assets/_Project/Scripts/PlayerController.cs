@@ -8,7 +8,6 @@ public class PlayerController : MonoBehaviour
     [Header("Movement")]
     [SerializeField] private float moveSpeed = 5f;
     [SerializeField] private float sprintSpeed = 9f;
-    [SerializeField] private float turnSpeed = 720f;
     [SerializeField] private float jumpForce = 8f;
 
     [Header("Ground Check")]
@@ -113,9 +112,6 @@ public class PlayerController : MonoBehaviour
         Vector3 horizontalVelocity = inputDirection * currentSpeed;
         rb.linearVelocity = new Vector3(horizontalVelocity.x, rb.linearVelocity.y, horizontalVelocity.z);
 
-        Vector3 facing = inputDirection.sqrMagnitude > 0.0001f ? inputDirection : horizontalVelocity;
-        if (facing.sqrMagnitude > 0.01f)
-            rb.MoveRotation(Quaternion.RotateTowards(rb.rotation, Quaternion.LookRotation(facing), turnSpeed * Time.fixedDeltaTime));
 
         // Fall protection
         if (transform.position.y < fallResetY)

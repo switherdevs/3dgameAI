@@ -12,7 +12,8 @@ public class AmmoPickup : MonoBehaviour
 
     void OnTriggerEnter(Collider other)
     {
-        var gun = other.GetComponent<Gun>();
+        var inventory = other.GetComponentInParent<WeaponInventory>();
+        var gun = inventory != null ? inventory.SelectedWeapon : other.GetComponent<Gun>();
         if (gun == null) gun = other.GetComponentInParent<Gun>();
         if (gun == null) gun = other.GetComponentInChildren<Gun>();
         if (gun == null) return;

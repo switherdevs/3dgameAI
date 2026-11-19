@@ -9,6 +9,7 @@ public class GameUI : MonoBehaviour
     [SerializeField] private TextMeshProUGUI healthText;
     [SerializeField] private TextMeshProUGUI enemiesText;
     [SerializeField] private TextMeshProUGUI ammoText;
+    [SerializeField] private TextMeshProUGUI weaponText;
     [SerializeField] private Image healthFill;
 
     [Header("Dead UI")]
@@ -18,6 +19,7 @@ public class GameUI : MonoBehaviour
     [SerializeField] private UnityEngine.UI.Button loadButton;
 
     private PlayerHealth playerHealth;
+    private WeaponInventory inventory;
     private Gun playerGun;
     private bool isDead = false;
 
@@ -60,13 +62,32 @@ public class GameUI : MonoBehaviour
             if (t != null) loadButton = t.GetComponent<UnityEngine.UI.Button>();
         }
 
+        if (weaponText == null && transform.Find("AmmoPanel/WeaponText") != null)
+            weaponText = transform.Find("AmmoPanel/WeaponText").GetComponent<TextMeshProUGUI>();
+        if (weaponText == null && ammoText != null)
+        {
+            var label = new GameObject("WeaponText", typeof(RectTransform), typeof(TextMeshProUGUI));
+            label.transform.SetParent(ammoText.transform.parent, false);
+            var rect = label.GetComponent<RectTransform>();
+            rect.anchorMin = new Vector2(0f, 1f);
+            rect.anchorMax = new Vector2(1f, 1f);
+            rect.pivot = new Vector2(0f, 1f);
+            rect.anchoredPosition = new Vector2(12f, -8f);
+            rect.sizeDelta = new Vector2(280f, 30f);
+            weaponText = label.GetComponent<TextMeshProUGUI>();
+            weaponText.font = ammoText.font;
+            weaponText.fontSize = 18f;
+            weaponText.color = Color.white;
+        }
         if (deadPanel != null) deadPanel.SetActive(false);
 
         var player = GameObject.FindWithTag("Player");
         if (player != null)
         {
             playerHealth = player.GetComponent<PlayerHealth>();
-            playerGun = player.GetComponentInChildren<Gun>();
+            inventory = player.GetComponent<WeaponInventory>();
+            playerGun = inventory != null ? inventory.SelectedWeapon : player.GetComponentInChildren<Gun>();
+            if (inventory != null) inventory.OnSelectedWeaponChanged += OnWeaponChanged;
         }
         if (ammoText == null && transform.Find("AmmoPanel/AmmoText") != null)
             ammoText = transform.Find("AmmoPanel/AmmoText").GetComponent<TextMeshProUGUI>();
@@ -81,6 +102,7 @@ public class GameUI : MonoBehaviour
         }
         RefreshHealth(playerHealth != null ? playerHealth.CurrentHealth : 0);
         RefreshAmmo();
+        RefreshWeapon();
         RefreshEnemies();
 
         Cursor.lockState = CursorLockMode.Locked;
@@ -91,6 +113,7 @@ public class GameUI : MonoBehaviour
     {
         RefreshEnemies();
         RefreshAmmo();
+        RefreshWeapon();
 
         if (isDead)
         {
@@ -126,7 +149,13 @@ public class GameUI : MonoBehaviour
 
     void RefreshAmmo()
     {
-        if (playerGun == null)
+        if (inventory == null)
+        {
+            var player = GameObject.FindWithTag("Player");
+            if (player != null) inventory = player.GetComponent<WeaponInventory>();
+        }
+        if (inventory != null) playerGun = inventory.SelectedWeapon;
+        else if (playerGun == null)
         {
             var player = GameObject.FindWithTag("Player");
             if (player != null) playerGun = player.GetComponentInChildren<Gun>();
@@ -138,6 +167,24 @@ public class GameUI : MonoBehaviour
         }
         if (ammoText != null && playerGun != null)
             ammoText.text = $"{playerGun.CurrentAmmo:00}  /  {playerGun.ReserveAmmo:000}";
+    }
+
+    void OnWeaponChanged(Gun gun)
+    {
+        playerGun = gun;
+        RefreshWeapon();
+        RefreshAmmo();
+    }
+
+    void RefreshWeapon()
+    {
+        if (weaponText == null)
+        {
+            var label = transform.Find("AmmoPanel/WeaponText");
+            if (label != null) weaponText = label.GetComponent<TextMeshProUGUI>();
+        }
+        if (weaponText != null)
+            weaponText.text = playerGun != null ? playerGun.gameObject.name : "NO WEAPON";
     }
 
     void RefreshEnemies()
