@@ -6,9 +6,12 @@ public class ThirdPersonCamera : MonoBehaviour
     [Header("Target")]
     [SerializeField] private Transform target;
     [Header("Orbit")]
-    [SerializeField] private float distance = 5f;
-    [SerializeField] private float height = 2f;
+    [SerializeField] private float distance = 3.5f;
+    [SerializeField] private float height = 1.7f;
+    [SerializeField] private float shoulderOffset = 0.65f;
+    [SerializeField] private float lookHeight = 1.4f;
     [SerializeField] private float rotateSpeed = 200f;
+    [SerializeField] private float sensitivity = 1f;
     [SerializeField] private float minPitch = -45f;
     [SerializeField] private float maxPitch = 60f;
     [Header("Follow")]
@@ -28,6 +31,9 @@ public class ThirdPersonCamera : MonoBehaviour
         pitch = transform.eulerAngles.x;
     }
 
+    public float GetSensitivity() => sensitivity;
+    public void SetSensitivity(float value) => sensitivity = Mathf.Max(0f, value);
+
     void LateUpdate()
     {
         if (target == null) return;
@@ -36,14 +42,15 @@ public class ThirdPersonCamera : MonoBehaviour
         if (mouse != null)
         {
             var delta = mouse.delta.ReadValue();
-            yaw += delta.x * rotateSpeed * Time.deltaTime;
-            pitch -= delta.y * rotateSpeed * Time.deltaTime;
+            yaw += delta.x * rotateSpeed * sensitivity * Time.deltaTime;
+            pitch -= delta.y * rotateSpeed * sensitivity * Time.deltaTime;
             pitch = Mathf.Clamp(pitch, minPitch, maxPitch);
         }
 
         Quaternion rot = Quaternion.Euler(pitch, yaw, 0f);
-        Vector3 idealPos = target.position + Vector3.up * height + rot * new Vector3(0f, 0f, -distance);
-        transform.position = Vector3.Lerp(transform.position, idealPos, followSpeed * Time.deltaTime);
-        transform.LookAt(target.position + Vector3.up * (height * 0.5f));
+        Vector3 focus = target.position + Vector3.up * lookHeight;
+        Vector3 idealPos = focus + rot * new Vector3(shoulderOffset, height - lookHeight, -distance);
+        transform.position = Vector3.Lerp(transform.position, idealPos, 1f - Mathf.Exp(-followSpeed * Time.deltaTime));
+        transform.rotation = Quaternion.LookRotation(focus + rot * Vector3.right * shoulderOffset - transform.position, Vector3.up);
     }
 }

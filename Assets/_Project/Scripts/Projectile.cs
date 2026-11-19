@@ -47,13 +47,19 @@ public class Projectile : MonoBehaviour
         }
     }
 
-    void OnCollisionEnter(Collision collision)
+void OnCollisionEnter(Collision collision)
     {
+        // Ignore the shooter so the projectile can leave the player's collider.
+        if (collision.collider.CompareTag("Player")) return;
+
         // Hiệu ứng va chạm
         ContactPoint contact = collision.contacts[0];
+        BulletHole.Create(contact.point, contact.normal);
         if (impactEffectPrefab != null)
         {
             var instance = Instantiate(impactEffectPrefab, contact.point, Quaternion.LookRotation(contact.normal));
+            var particleSystem = instance.GetComponent<ParticleSystem>();
+            if (particleSystem != null) particleSystem.Play(true);
             Destroy(instance, 2f);
         }
 

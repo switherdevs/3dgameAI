@@ -12,23 +12,24 @@ public class SettingsMenu : MonoBehaviour
     [SerializeField] private TextMeshProUGUI sensitivityValueText;
     [SerializeField] private Button resumeButton;
 
-    private PlayerController playerController;
+    private ThirdPersonCamera thirdPersonCamera;
     private bool isOpen = false;
+    private PlayerController playerController;
 
     void Awake()
     {
         if (settingsPanel != null) settingsPanel.SetActive(false);
         Time.timeScale = 1f;
 
+        thirdPersonCamera = Camera.main != null ? Camera.main.GetComponent<ThirdPersonCamera>() : null;
         var player = GameObject.FindWithTag("Player");
-        if (player != null)
-            playerController = player.GetComponent<PlayerController>();
+        if (player != null) playerController = player.GetComponent<PlayerController>();
 
-        if (mouseSensitivitySlider != null && playerController != null)
+        if (mouseSensitivitySlider != null && thirdPersonCamera != null)
         {
-            mouseSensitivitySlider.value = playerController.GetMouseSensitivity();
+            mouseSensitivitySlider.value = thirdPersonCamera.GetSensitivity();
             mouseSensitivitySlider.onValueChanged.AddListener(OnSensitivityChanged);
-            UpdateSensitivityText(playerController.GetMouseSensitivity());
+            UpdateSensitivityText(thirdPersonCamera.GetSensitivity());
         }
 
         if (resumeButton != null)
@@ -55,6 +56,7 @@ public class SettingsMenu : MonoBehaviour
     {
         isOpen = true;
         Time.timeScale = 0f; // Tạm dừng game
+        if (playerController != null) playerController.enabled = false;
         if (settingsPanel != null) settingsPanel.SetActive(true);
         Cursor.lockState = CursorLockMode.None;
         Cursor.visible = true;
@@ -64,6 +66,7 @@ public class SettingsMenu : MonoBehaviour
     {
         isOpen = false;
         Time.timeScale = 1f; // Tiếp tục game
+        if (playerController != null) playerController.enabled = true;
         if (settingsPanel != null) settingsPanel.SetActive(false);
         Cursor.lockState = CursorLockMode.Locked;
         Cursor.visible = false;
@@ -71,8 +74,8 @@ public class SettingsMenu : MonoBehaviour
 
     void OnSensitivityChanged(float value)
     {
-        if (playerController != null)
-            playerController.SetMouseSensitivity(value);
+        if (thirdPersonCamera != null)
+            thirdPersonCamera.SetSensitivity(value);
         UpdateSensitivityText(value);
     }
 

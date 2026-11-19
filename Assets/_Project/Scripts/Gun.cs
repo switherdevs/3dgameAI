@@ -24,9 +24,14 @@ public class Gun : MonoBehaviour
     [SerializeField] private float recoilReturnSpeed = 10f;
     [SerializeField] private float recoilRise = 0.05f;
 
-    [Header("Reload")]
+    [Header("Ammo")]
+    [SerializeField] private int magazineSize = 30;
+    [SerializeField] private int reserveAmmo = 90;
+    [SerializeField] private int ammoPerPickup = 30;
     [SerializeField] private float reloadTime = 1.5f;
     [SerializeField] private Vector3 reloadPosition = new Vector3(0f, 0.3f, 0f);
+
+    private int currentAmmo;
 
     [Header("Effects")]
     [SerializeField] private GameObject muzzleFlashPrefab;
@@ -45,6 +50,7 @@ public class Gun : MonoBehaviour
 
     void Awake()
     {
+        currentAmmo = magazineSize;
         var main = Camera.main;
         if (main != null) cam = main.transform;
 
@@ -63,6 +69,9 @@ public class Gun : MonoBehaviour
         if (cam == null && Camera.main != null) cam = Camera.main.transform;
 
         var keyboard = Keyboard.current;
+        if (keyboard != null && keyboard.rKey.wasPressedThisFrame)
+            StartReload();
+
         if (keyboard != null && keyboard[toggleKey].wasPressedThisFrame)
         {
             isAutomatic = !isAutomatic;
@@ -72,8 +81,11 @@ public class Gun : MonoBehaviour
         if (flashTimer > 0f)
         {
             flashTimer -= Time.deltaTime;
+            var muzzleLight = muzzle.GetComponent<Light>();
+            if (muzzleLight != null) muzzleLight.intensity = 18f * Mathf.Clamp01(flashTimer / flashDuration);
             if (flashTimer <= 0f)
             {
+                if (muzzleLight != null) muzzleLight.intensity = 0f;
                 var flash = muzzle.Find("MuzzleFlash");
                 if (flash != null) flash.gameObject.SetActive(false);
             }
@@ -88,6 +100,10 @@ public class Gun : MonoBehaviour
 
             if (t >= 1f)
             {
+                int loaded = Mathf.Min(magazineSize - currentAmmo, reserveAmmo);
+                currentAmmo += loaded;
+                reserveAmmo -= loaded;
+                OnAmmoChanged?.Invoke(currentAmmo, reserveAmmo);
                 isReloading = false;
                 reloadTimer = 0f;
                 gunTransform.localPosition = gunIdlePosition;
@@ -123,6 +139,7 @@ public class Gun : MonoBehaviour
 
     void StartReload()
     {
+        if (isReloading || currentAmmo >= magazineSize || reserveAmmo <= 0) return;
         isReloading = true;
         reloadTimer = 0f;
         Debug.Log("[Gun] Đang nạp đạn...");
@@ -130,30 +147,47 @@ public class Gun : MonoBehaviour
 
     void Fire()
     {
+        if (currentAmmo <= 0 || isReloading || bulletPrefab == null || cam == null) return;
+
+        currentAmmo--;
+        OnAmmoChanged?.Invoke(currentAmmo, reserveAmmo);
         if (bulletPrefab != null && cam != null)
         {
-            // Tạo đạn vật lý phát sáng
-            var bullet = Instantiate(bulletPrefab, muzzle.position, muzzle.rotation);
+            Vector3 aimPoint = cam.position + cam.forward * range;
+            var hits = Physics.RaycastAll(cam.position, cam.forward, range, ~0, QueryTriggerInteraction.Ignore);
+            float nearest = range;
+            foreach (var hit in hits)
+            {
+                if (hit.transform.root == transform.root) continue;
+                if (hit.distance < nearest)
+                {
+                    nearest = hit.distance;
+                    aimPoint = hit.point;
+                }
+            }
+
+            Vector3 direction = (aimPoint - muzzle.position).normalized;
+            var muzzleLight = muzzle.GetComponent<Light>();
+            if (muzzleLight != null) muzzleLight.intensity = 18f;
+            var bullet = Instantiate(bulletPrefab, muzzle.position, Quaternion.LookRotation(direction));
             var rb = bullet.GetComponent<Rigidbody>();
             if (rb != null)
-                rb.linearVelocity = muzzle.forward * bulletSpeed;
-            Destroy(bullet, bulletLife);
-        }
-        else if (cam != null)
-        {
-            // Fallback: raycast nếu không có bulletPrefab
-            if (Physics.Raycast(cam.position, cam.forward, out var hit, range, shootableMask))
             {
-                var enemyHealth = hit.collider.GetComponent<EnemyHealth>();
-                if (enemyHealth != null)
-                    enemyHealth.TakeDamage(damage);
-                ShowImpactEffect(hit.point, hit.normal);
+                rb.useGravity = false;
+                rb.constraints = RigidbodyConstraints.FreezeRotation;
+                rb.angularVelocity = Vector3.zero;
+                rb.linearVelocity = direction * bulletSpeed;
             }
+            foreach (var shooterCollider in transform.root.GetComponentsInChildren<Collider>())
+            {
+                foreach (var bulletCollider in bullet.GetComponentsInChildren<Collider>())
+                    Physics.IgnoreCollision(shooterCollider, bulletCollider);
+            }
+            Destroy(bullet, bulletLife);
         }
 
         recoilOffset = new Vector3(0f, recoilRise, -recoilKick);
         gunTransform.localPosition = gunIdlePosition + recoilOffset;
-
         ShowMuzzleFlash();
     }
 
@@ -164,12 +198,16 @@ public class Gun : MonoBehaviour
         if (flash != null)
         {
             flash.gameObject.SetActive(true);
+            var particleSystem = flash.GetComponent<ParticleSystem>();
+            if (particleSystem != null) particleSystem.Play(true);
         }
         else if (muzzleFlashPrefab != null)
         {
             var instance = Instantiate(muzzleFlashPrefab, muzzle.position, muzzle.rotation, muzzle);
             instance.name = "MuzzleFlash";
-            Destroy(instance, flashDuration);
+            var particleSystem = instance.GetComponent<ParticleSystem>();
+            if (particleSystem != null) particleSystem.Play(true);
+            Destroy(instance, 2f);
         }
     }
 
@@ -182,7 +220,17 @@ public class Gun : MonoBehaviour
         }
     }
 
+    public System.Action<int, int> OnAmmoChanged;
+    public int CurrentAmmo => currentAmmo;
+    public int ReserveAmmo => reserveAmmo;
     public bool IsAutomatic => isAutomatic;
     public void SetAutomatic(bool value) => isAutomatic = value;
     public bool IsReloading => isReloading;
+
+    public void AddReserveAmmo(int amount)
+    {
+        if (amount <= 0) return;
+        reserveAmmo += amount;
+        OnAmmoChanged?.Invoke(currentAmmo, reserveAmmo);
+    }
 }

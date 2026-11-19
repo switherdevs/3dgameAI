@@ -1,12 +1,15 @@
 using UnityEngine;
 using TMPro;
 using UnityEngine.InputSystem;
+using UnityEngine.UI;
 
 public class GameUI : MonoBehaviour
 {
     [Header("HUD")]
     [SerializeField] private TextMeshProUGUI healthText;
     [SerializeField] private TextMeshProUGUI enemiesText;
+    [SerializeField] private TextMeshProUGUI ammoText;
+    [SerializeField] private Image healthFill;
 
     [Header("Dead UI")]
     [SerializeField] private GameObject deadPanel;
@@ -15,21 +18,28 @@ public class GameUI : MonoBehaviour
     [SerializeField] private UnityEngine.UI.Button loadButton;
 
     private PlayerHealth playerHealth;
+    private Gun playerGun;
     private bool isDead = false;
 
     void Awake()
     {
-        if (healthText == null)
+        foreach (var text in GetComponentsInChildren<TextMeshProUGUI>(true))
         {
-            var t = transform.Find("HPText");
-            if (t != null) healthText = t.GetComponent<TextMeshProUGUI>();
+            if (text.name == "HPText") healthText = text;
+            else if (text.name == "EnemiesText") enemiesText = text;
+            else if (text.name == "AmmoText") ammoText = text;
         }
-        if (enemiesText == null)
+        if (healthFill == null)
         {
-            var t = transform.Find("EnemiesText");
-            if (t != null) enemiesText = t.GetComponent<TextMeshProUGUI>();
+            var fill = transform.Find("HealthPanel/HealthBar/Fill");
+            if (fill != null) healthFill = fill.GetComponent<Image>();
         }
         if (deadPanel == null)
+        {
+            var t = transform.Find("DeadPanel");
+            if (t != null) deadPanel = t.gameObject;
+        }
+        else if (deadPanel.transform.parent != transform)
         {
             var t = transform.Find("DeadPanel");
             if (t != null) deadPanel = t.gameObject;
@@ -53,13 +63,24 @@ public class GameUI : MonoBehaviour
         if (deadPanel != null) deadPanel.SetActive(false);
 
         var player = GameObject.FindWithTag("Player");
-        if (player != null) playerHealth = player.GetComponent<PlayerHealth>();
+        if (player != null)
+        {
+            playerHealth = player.GetComponent<PlayerHealth>();
+            playerGun = player.GetComponentInChildren<Gun>();
+        }
+        if (ammoText == null && transform.Find("AmmoPanel/AmmoText") != null)
+            ammoText = transform.Find("AmmoPanel/AmmoText").GetComponent<TextMeshProUGUI>();
+        if (healthText == null && transform.Find("HealthPanel/HPText") != null)
+            healthText = transform.Find("HealthPanel/HPText").GetComponent<TextMeshProUGUI>();
+        if (enemiesText == null && transform.Find("HealthPanel/EnemiesText") != null)
+            enemiesText = transform.Find("HealthPanel/EnemiesText").GetComponent<TextMeshProUGUI>();
         if (playerHealth != null)
         {
             playerHealth.OnHealthChanged += RefreshHealth;
             playerHealth.OnDie += OnPlayerDie;
         }
         RefreshHealth(playerHealth != null ? playerHealth.CurrentHealth : 0);
+        RefreshAmmo();
         RefreshEnemies();
 
         Cursor.lockState = CursorLockMode.Locked;
@@ -69,6 +90,7 @@ public class GameUI : MonoBehaviour
     void Update()
     {
         RefreshEnemies();
+        RefreshAmmo();
 
         if (isDead)
         {
@@ -82,7 +104,40 @@ public class GameUI : MonoBehaviour
 
     void RefreshHealth(int current)
     {
-        if (healthText != null) healthText.text = "HP: " + current;
+        if (playerHealth == null)
+        {
+            var player = GameObject.FindWithTag("Player");
+            if (player != null) playerHealth = player.GetComponent<PlayerHealth>();
+        }
+        if (healthText == null)
+        {
+            var text = transform.Find("HealthPanel/HPText");
+            if (text != null) healthText = text.GetComponent<TextMeshProUGUI>();
+        }
+        if (healthFill == null)
+        {
+            var fill = transform.Find("HealthPanel/HealthBar/Fill");
+            if (fill != null) healthFill = fill.GetComponent<Image>();
+        }
+        int maximum = playerHealth != null ? playerHealth.MaxHealth : 100;
+        if (healthText != null) healthText.text = $"HP: {current:000}";
+        if (healthFill != null) healthFill.fillAmount = maximum > 0 ? (float)current / maximum : 0f;
+    }
+
+    void RefreshAmmo()
+    {
+        if (playerGun == null)
+        {
+            var player = GameObject.FindWithTag("Player");
+            if (player != null) playerGun = player.GetComponentInChildren<Gun>();
+        }
+        if (ammoText == null)
+        {
+            var ammo = transform.Find("AmmoPanel/AmmoText");
+            if (ammo != null) ammoText = ammo.GetComponent<TextMeshProUGUI>();
+        }
+        if (ammoText != null && playerGun != null)
+            ammoText.text = $"{playerGun.CurrentAmmo:00}  /  {playerGun.ReserveAmmo:000}";
     }
 
     void RefreshEnemies()
